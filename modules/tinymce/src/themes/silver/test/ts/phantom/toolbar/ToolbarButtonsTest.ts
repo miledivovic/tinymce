@@ -32,6 +32,7 @@ describe('phantom.tinymce.themes.silver.toolbar.ToolbarButtonsTest', () => {
             disabled: false,
             tooltip: Optional.some('tooltip'),
             icon: Optional.none(),
+            chevron: Optional.none(),
             text: Optional.some('button1'),
             onSetup: (_api: Toolbar.ToolbarButtonInstanceApi) => {
               store.adder('onSetup.1')();

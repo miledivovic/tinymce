@@ -16,6 +16,7 @@ export interface BaseToolbarButtonInstanceApi {
 
 export interface ToolbarButtonSpec extends BaseToolbarButtonSpec<ToolbarButtonInstanceApi> {
   type?: 'button';
+  chevron?: 'left' | 'right';
   onAction: (api: ToolbarButtonInstanceApi) => void;
 }
 
@@ -34,6 +35,7 @@ export interface BaseToolbarButton<I extends BaseToolbarButtonInstanceApi> {
 
 export interface ToolbarButton extends BaseToolbarButton<ToolbarButtonInstanceApi> {
   type: 'button';
+  chevron: Optional<'left' | 'right'>;
   onAction: (api: ToolbarButtonInstanceApi) => void;
 }
 
@@ -47,6 +49,7 @@ export const baseToolbarButtonFields = [
 
 export const toolbarButtonSchema = ValueSchema.objOf([
   FieldSchema.strictString('type'),
+  FieldSchema.optionStringEnum('chevron', [ 'left', 'right' ]),
   FieldSchema.strictFunction('onAction')
 ].concat(baseToolbarButtonFields));
 

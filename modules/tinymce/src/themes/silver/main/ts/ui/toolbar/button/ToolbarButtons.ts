@@ -64,6 +64,7 @@ interface GeneralToolbarButton<T> {
   icon: Optional<string>;
   text: Optional<string>;
   tooltip: Optional<string>;
+  chevron: Optional<'left' | 'right'>;
   onAction: (api: T) => void;
   disabled: boolean;
 }
@@ -91,6 +92,7 @@ const renderCommonStructure = (
   icon: Optional<string>,
   text: Optional<string>,
   tooltip: Optional<string>,
+  chevron: Optional<'left' | 'right'>,
   receiver: Optional<string>,
   behaviours: Optional<Behaviours>,
   providersBackstage: UiFactoryBackstageProviders
@@ -105,12 +107,31 @@ const renderCommonStructure = (
   return {
     dom: {
       tag: 'button',
-      classes: [ ToolbarButtonClasses.Button ].concat(text.isSome() ? [ ToolbarButtonClasses.MatchWidth ] : []).concat(needsRtlClass ? [ ToolbarButtonClasses.IconRtl ] : []),
+      classes: [ ToolbarButtonClasses.Button ]
+        .concat(text.isSome() ? [ ToolbarButtonClasses.MatchWidth ] : [])
+        .concat(needsRtlClass ? [ ToolbarButtonClasses.IconRtl ] : [])
+        .concat(chevron.isSome() ? [ ToolbarButtonClasses.ButtonWide ] : [])
+        .concat(chevron.isSome() && icon.isNone() ? [ ToolbarButtonClasses.ButtonNarrow ] : []),
       attributes: getTooltipAttributes(tooltip, providersBackstage)
     },
     components: componentRenderPipeline([
       icon.map((iconName) => renderIconFromPack(getIconName(iconName), providersBackstage.icons)),
-      text.map((text) => renderLabel(text, ToolbarButtonClasses.Button, providersBackstage))
+      text.map((text) => renderLabel(text, ToolbarButtonClasses.Button, providersBackstage)),
+      chevron.map((chevronDirection) => renderIconFromPack(getIconName(`chevron-${chevronDirection}`), providersBackstage.icons))
+      // chevron.map((chevronDirection) => {
+      //   return {
+      //     dom: {
+      //       tag: 'div',
+      //       // classes: [ `${prefix}__select-chevron` ],
+      //       classes: [ `tox-tbtn__select-chevron` ],
+      //       // innerHtml: Icons.get('chevron-down', providersBackstage.icons)
+
+      //       components: [
+      //         renderIconFromPack(getIconName(`chevron-${chevronDirection}`), providersBackstage.icons)
+      //       ]
+      //     }
+      //   };
+      // })
     ]),
 
     eventOrder: {
@@ -157,7 +178,7 @@ const renderFloatingToolbarButton = (spec: Toolbar.GroupToolbarButton, backstage
       toggledClass: ToolbarButtonClasses.Ticked
     },
     parts: {
-      button: renderCommonStructure(spec.icon, spec.text, spec.tooltip, Optional.none(), Optional.none(), sharedBackstage.providers),
+      button: renderCommonStructure(spec.icon, spec.text, spec.tooltip, Optional.none(), Optional.none(), Optional.none(), sharedBackstage.providers),
       toolbar: {
         dom: {
           tag: 'div',
@@ -171,7 +192,7 @@ const renderFloatingToolbarButton = (spec: Toolbar.GroupToolbarButton, backstage
 
 const renderCommonToolbarButton = <T>(spec: GeneralToolbarButton<T>, specialisation: Specialisation<T>, providersBackstage: UiFactoryBackstageProviders) => {
   const editorOffCell = Cell(Fun.noop);
-  const structure = renderCommonStructure(spec.icon, spec.text, spec.tooltip, Optional.none(), Optional.none(), providersBackstage);
+  const structure = renderCommonStructure(spec.icon, spec.text, spec.tooltip, spec.chevron, Optional.none(), Optional.none(), providersBackstage);
   return AlloyButton.sketch({
     dom: structure.dom,
     components: structure.components,
@@ -208,7 +229,7 @@ const renderToolbarButtonWith = (spec: Toolbar.ToolbarButton, providersBackstage
 const renderToolbarToggleButton = (spec: Toolbar.ToolbarToggleButton, providersBackstage: UiFactoryBackstageProviders) => renderToolbarToggleButtonWith(spec, providersBackstage, [ ]);
 
 const renderToolbarToggleButtonWith = (spec: Toolbar.ToolbarToggleButton, providersBackstage: UiFactoryBackstageProviders, bonusEvents: AlloyEvents.AlloyEventKeyAndHandler<any>[]) => Merger.deepMerge(
-  renderCommonToolbarButton(spec,
+  renderCommonToolbarButton(spec as any, // TODO: this would not work
     {
       toolbarButtonBehaviours: [
         Replacing.config({ }),
@@ -333,7 +354,7 @@ const renderSplitButton = (spec: Toolbar.ToolbarSplitButton, sharedBackstage: Ui
 
     components: [
       AlloySplitDropdown.parts.button(
-        renderCommonStructure(spec.icon, spec.text, Optional.none(), Optional.some(displayChannel), Optional.some([
+        renderCommonStructure(spec.icon, spec.text, Optional.none(), Optional.none(), Optional.some(displayChannel), Optional.some([
           Toggling.config({ toggleClass: ToolbarButtonClasses.Ticked, toggleOnExecute: false })
         ]), sharedBackstage.providers)
       ),
@@ -356,7 +377,6 @@ const renderSplitButton = (spec: Toolbar.ToolbarSplitButton, sharedBackstage: Ui
 };
 
 export {
-  renderCommonStructure,
   renderFloatingToolbarButton,
   renderToolbarButton,
   renderToolbarButtonWith,

@@ -164,7 +164,6 @@ const addButtons = (editor: Editor, selectionTargets: SelectionTargets, clipboar
     onAction: cmd('mceInsertTable'),
     icon: 'table'
   });
-
 };
 
 const addToolbars = (editor: Editor) => {
@@ -178,6 +177,40 @@ const addToolbars = (editor: Editor) => {
       scope: 'node',
       position: 'node'
     });
+
+    editor.ui.registry.addContextToolbarGroup('quicktablecell', {
+      items: 'tablecellbackground tablecellbordercolor tablecellborderwidth tablecellvalign | tablemergecells tablesplitcells | tablecellprops', // TODO: Add new buttons
+      icon: 'table-cell',
+      predicate: isTable, // Could be used to disable the button?
+      scope: 'node',
+      position: 'node',
+      // tooltip: // TODO: add this
+    });
+
+    editor.ui.registry.addContextToolbarGroup('quicktablerow', {
+      items: 'tableinsertrowbefore tableinsertrowafter | advtablesort | tablerowprops tabledeleterow', // TODO: Add copy/paste row
+      icon: 'table-row',
+      predicate: isTable,
+      scope: 'node',
+      position: 'node'
+    });
+
+    editor.ui.registry.addContextToolbarGroup('quicktablecol', {
+      items: 'tableinsertcolbefore tableinsertcolafter | advtablesort | tablecolprops tabledeletecol', // TODO: Add copy/paste col
+      icon: 'table-column',
+      predicate: isTable,
+      scope: 'node',
+      position: 'node'
+    });
+
+    // editor.ui.registry.addContextToolbarGroup('quickenormoustest', {
+    //   items: 'table tableprops tablecellprops tablerowprops | tabledelete | tableinsertrowbefore tableinsertrowafter tabledeleterow | tableinsertcolbefore tableinsertcolafter tabledeletecol | tablecutrow tablecopyrow tablepasterowbefore tablepasterowafter', // TODO: Add copy/paste col
+    //   // items: 'table tableprops tablecellprops tablerowprops  tabledelete  tableinsertrowbefore tableinsertrowafter tabledeleterow  tableinsertcolbefore tableinsertcolafter tabledeletecol  tablecutrow tablecopyrow tablepasterowbefore tablepasterowafter', // TODO: Add copy/paste col
+    //   icon: 'table-column',
+    //   predicate: isTable,
+    //   scope: 'node',
+    //   position: 'node'
+    // });
   }
 };
 

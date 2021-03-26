@@ -16,19 +16,20 @@ import { Css, Focus, Scroll, SugarBody, SugarElement } from '@ephox/sugar';
 import Editor from 'tinymce/core/api/Editor';
 import Delay from 'tinymce/core/api/util/Delay';
 import { getToolbarMode, ToolbarMode } from './api/Settings';
-import { UiFactoryBackstage, UiFactoryBackstageProviders } from './backstage/Backstage';
+import { UiFactoryBackstage } from './backstage/Backstage';
 import { hideContextToolbarEvent, showContextToolbarEvent } from './ui/context/ContextEditorEvents';
-import { ContextForm } from './ui/context/ContextForm';
+import { buildContextFormGroups } from './ui/context/ContextForm';
 import { getContextToolbarBounds } from './ui/context/ContextToolbarBounds';
 import * as ToolbarLookup from './ui/context/ContextToolbarLookup';
 import * as ToolbarScopes from './ui/context/ContextToolbarScopes';
 import { forwardSlideEvent, renderContextToolbar } from './ui/context/ContextUi';
-import { renderToolbar } from './ui/toolbar/CommonToolbar';
+import { renderToolbarButton } from './ui/toolbar/button/ToolbarButtons';
+import { renderToolbar, ToolbarGroup } from './ui/toolbar/CommonToolbar';
 import { identifyButtons } from './ui/toolbar/Integration';
 
 type ScopedToolbars = ToolbarScopes.ScopedToolbars;
 
-export type ContextTypes = InlineContent.ContextToolbar | InlineContent.ContextForm;
+export type ContextTypes = InlineContent.ContextToolbar | InlineContent.ContextForm | InlineContent.ContextToolbarGroup;
 
 interface Extras {
   backstage: UiFactoryBackstage;
@@ -138,6 +139,7 @@ const register = (editor: Editor, registryContextToolbars, sink: AlloyComponent,
   const close = () => {
     lastAnchor.set(Optional.none());
     InlineView.hide(contextbar);
+    activeGroup.set(Optional.none());
   };
 
   const forceHide = () => {
@@ -183,9 +185,10 @@ const register = (editor: Editor, registryContextToolbars, sink: AlloyComponent,
     ])
   });
 
-  const getScopes: () => ScopedToolbars = Thunk.cached(() => ToolbarScopes.categorise(registryContextToolbars, (toolbarApi) => {
-    // ASSUMPTION: This should only ever show one context toolbar since it's used for context forms hence [toolbarApi]
-    const alloySpec = buildToolbar([ toolbarApi ]);
+  const getScopes: () => ScopedToolbars = Thunk.cached(() => ToolbarScopes.categorise(registryContextToolbars, (type, toolbars) => {
+    // ASSUMPTION: This should only ever show one context toolbar since it's used for context forms hence [toolbars]
+    activeGroup.set(Optional.some(type));
+    const alloySpec = buildToolbar([ toolbars ]);
     AlloyTriggers.emitWith(contextbar, forwardSlideEvent, {
       forwardContents: wrapInPopDialog(alloySpec)
     });
@@ -193,28 +196,66 @@ const register = (editor: Editor, registryContextToolbars, sink: AlloyComponent,
 
   type ContextToolbarButtonTypes = Toolbar.ToolbarButtonSpec | Toolbar.ToolbarMenuButtonSpec | Toolbar.ToolbarSplitButtonSpec | Toolbar.ToolbarToggleButtonSpec | Toolbar.GroupToolbarButtonSpec;
 
-  const buildContextToolbarGroups = (allButtons: Record<string, ContextToolbarButtonTypes>, ctx: InlineContent.ContextToolbar) =>
+  const buildContextToolbarGroups = (allButtons: Record<string, ContextToolbarButtonTypes>, ctx: InlineContent.ContextToolbar | InlineContent.ContextToolbarGroup) =>
     identifyButtons(editor, { buttons: allButtons, toolbar: ctx.items, allowToolbarGroups: false }, extras, Optional.some([ 'form:' ]));
 
-  const buildContextMenuGroups = (ctx: InlineContent.ContextForm, providers: UiFactoryBackstageProviders) => ContextForm.buildInitGroups(ctx, providers);
+  // Can this be improved to use multiple levels? Or do we only support one level of nesting?
+  const activeGroup = Cell<Optional<string>>(Optional.none());
 
   const buildToolbar = (toolbars: Array<ContextTypes>): AlloySpec => {
     const { buttons } = editor.ui.registry.getAll();
     const scopes = getScopes();
-    const allButtons: Record<string, ContextToolbarButtonTypes> = { ...buttons, ...scopes.formNavigators };
-
+    const allButtons: Record<string, ContextToolbarButtonTypes> = { ...buttons, ...scopes.formNavigators, ...scopes.groupNavigators };
     // For context toolbars we don't want to use floating or sliding, so just restrict this
     // to scrolling or wrapping (default)
     const toolbarType = getToolbarMode(editor) === ToolbarMode.scrolling ? ToolbarMode.scrolling : ToolbarMode.default;
 
-    const initGroups = Arr.flatten(Arr.map(toolbars, (ctx) =>
-      ctx.type === 'contexttoolbar' ? buildContextToolbarGroups(allButtons, ctx) : buildContextMenuGroups(ctx, extras.backstage.shared.providers)
-    ));
+    const initGroups = Arr.flatten(Arr.map(toolbars, (ctx) => {
+      switch (ctx.type) {
+        case 'contexttoolbar':
+          return buildContextToolbarGroups(allButtons, ctx);
+        case 'contextform':
+          return buildContextFormGroups(ctx, extras.backstage.shared.providers);
+        case 'contexttoolbargroup':
+          return [
+            {
+              title: Optional.none(),
+              items: [
+                renderToolbarButton(
+                  {
+                    type: 'button',
+                    chevron: Optional.some('left'),
+                    onAction: () => {
+                      // This only allows for one level of nesting, but at the same time this is the case for toolbar groups atm.
+                      activeGroup.set(Optional.none());
+                      ToolbarLookup.lookup(getScopes(), editor).fold(
+                        close,
+                        (info) => {
+                          AlloyTriggers.emitWith(contextbar, forwardSlideEvent, {
+                            forwardContents: wrapInPopDialog(buildToolbar(info.toolbars))
+                          });
+                        }
+                      );
+                    },
+                    disabled: false,
+                    tooltip: Optional.some('Close group'),
+                    icon: Optional.none(),
+                    text: Optional.none(),
+                    onSetup: () => Fun.noop
+                  },
+                  extras.backstage.shared.providers
+                )
+              ]
+            } as ToolbarGroup,
+            ...buildContextToolbarGroups(allButtons, ctx)
+          ];
+      }
+    }));
 
     return renderToolbar({
       type: toolbarType,
       uid: Id.generate('context-toolbar'),
-      initGroups,
+      initGroups, // TODO: does this mean that multiple contexttoolbars are combined? -> Yup that is the case
       onEscape: Optional.none,
       cyclicKeying: true,
       providers: extras.backstage.shared.providers
@@ -240,7 +281,18 @@ const register = (editor: Editor, registryContextToolbars, sink: AlloyComponent,
     );
   };
 
-  const launchContext = (toolbarApi: Array<ContextTypes>, elem: Optional<Element>) => {
+  const getActiveGroup = (toolbars: Array<ContextTypes>) => {
+    const hasGroupInToolbars = (activeGroup: string) => Arr.find(toolbars, (toolbar) => (
+      toolbar.type === 'contexttoolbar' &&
+      Arr.contains(toolbar.items.trim().split(' '), activeGroup)
+    )).isSome();
+
+    return activeGroup.get().filter(hasGroupInToolbars).bind((activeGroup) => {
+      return Obj.get(getScopes().lookupTable, activeGroup);
+    });
+  };
+
+  const launchContext = (toolbars: Array<ContextTypes>, elem: Optional<Element>) => {
     clearTimer();
 
     // If a mobile context menu is open, don't launch else they'll probably overlap. For android, specifically.
@@ -248,13 +300,14 @@ const register = (editor: Editor, registryContextToolbars, sink: AlloyComponent,
       return;
     }
 
-    const toolbarSpec = buildToolbar(toolbarApi);
+    // If the context toolbar has an active subgroup, build and show that group instead
+    const toolbarSpec = buildToolbar(getActiveGroup(toolbars).map(Arr.pure).getOr(toolbars));
     const sElem = elem.map(SugarElement.fromDom);
 
-    // TINY-4495 ASSUMPTION: Can only do toolbarApi[0].position because ContextToolbarLookup.filterToolbarsByPosition
+    // TINY-4495 ASSUMPTION: Can only do toolbars[0].position because ContextToolbarLookup.filterToolbarsByPosition
     // ensures all toolbars returned by ContextToolbarLookup have the same position.
     // And everything else that gets toolbars from elsewhere only returns maximum 1 toolbar
-    const anchor = getAnchor(toolbarApi[0].position, sElem);
+    const anchor = getAnchor(toolbars[0].position, sElem);
 
     lastAnchor.set(Optional.some((anchor)));
     lastElement.set(elem);

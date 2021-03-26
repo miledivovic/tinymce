@@ -7,13 +7,12 @@
 
 import { AlloySpec, AlloyTriggers, Behaviour, Input, Keying, Memento } from '@ephox/alloy';
 import { InlineContent } from '@ephox/bridge';
-import { Id, Optional } from '@ephox/katamari';
-import { ToolbarMode } from '../../api/Settings';
+import { Optional } from '@ephox/katamari';
 import { UiFactoryBackstageProviders } from '../../backstage/Backstage';
-import { renderToolbar, ToolbarGroup } from '../toolbar/CommonToolbar';
+import { ToolbarGroup } from '../toolbar/CommonToolbar';
 import { generate } from './ContextFormButtons';
 
-const buildInitGroups = (ctx: InlineContent.ContextForm, providers: UiFactoryBackstageProviders): ToolbarGroup[] => {
+const buildContextFormGroups = (ctx: InlineContent.ContextForm, providers: UiFactoryBackstageProviders): ToolbarGroup[] => {
   // Cannot use the FormField.sketch, because the DOM structure doesn't have a wrapping group
   const inputAttributes = ctx.label.fold(
     () => ({ }),
@@ -63,16 +62,6 @@ const buildInitGroups = (ctx: InlineContent.ContextForm, providers: UiFactoryBac
   ];
 };
 
-const renderContextForm = (toolbarType: ToolbarMode, ctx: InlineContent.ContextForm, providers: UiFactoryBackstageProviders) => renderToolbar({
-  type: toolbarType,
-  uid: Id.generate('context-toolbar'),
-  initGroups: buildInitGroups(ctx, providers),
-  onEscape: Optional.none,
-  cyclicKeying: true,
-  providers
-});
-
-export const ContextForm = {
-  renderContextForm,
-  buildInitGroups
+export {
+  buildContextFormGroups
 };

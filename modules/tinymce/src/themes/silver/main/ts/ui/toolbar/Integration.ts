@@ -120,6 +120,8 @@ const types = {
     }
   ),
 
+  // contexttoolbargroupbutton: (editor: Editor, extras: Extras) => createContextToolbarGroupButton(editor, extras.backstage),
+
   styleSelectButton: (editor: Editor, extras: Extras) => createStyleSelect(editor, extras.backstage),
   fontsizeSelectButton: (editor: Editor, extras: Extras) => createFontsizeSelect(editor, extras.backstage),
   fontSelectButton: (editor: Editor, extras: Extras) => createFontSelect(editor, extras.backstage),
